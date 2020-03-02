@@ -36,49 +36,18 @@
 #include "vector_add.hpp"
 
 // Matrix sizes:
-#define A_WIDTH  128
-#define B_WIDTH  A_WIDTH
-#define C_WIDTH  A_WIDTH
+#define WIDTH  64
 #define NUM_ITER 1
-#define FLOAT_TAG 1
 
 // Host Vector Addition code (to compare results)
 template <typename TA, typename TB, typename TC>
 void vector_add (TA *A, TB *B, TC *C, uint64_t N) {
-        // for (uint64_t x = 0; x < N; x++) {
-        //         C[x] = A[x] + B[x];
-        // } 
-        uint64_t x;
-        for (x = 0; x+5 < N; x += 5) {
-                float a = A[x];
-                float a1 = A[x+1];
-                float a2 = A[x+2];
-                float a3 = A[x+3];
-                float a4 = A[x+4];
-
-                float b = B[x];
-                float b1 = B[x+1];
-                float b2 = B[x+2];
-                float b3 = B[x+3];
-                float b4 = B[x+4];
-
-                float sum = a + b;
-                float sum1 = a1 + b1;
-                float sum2 = a2 + b2;
-                float sum3 = a3 + b3;
-                float sum4 = a4 + b4;
-
-                C[x] = sum;
-                C[x+1] = sum1;
-                C[x+2] = sum2;
-                C[x+3] = sum3;
-                C[x+4] = sum4;
-        }
-        for(x; x < N; x++) {
+        for (uint64_t x = 0; x < N; x ++) {
                 C[x] = A[x] + B[x];
         }
         return;
 }
+
 
 // Compute the sum of squared error between vectors A and B (M x N)
 template <typename T>
@@ -94,9 +63,10 @@ double vector_sse (const T *A, const T *B, uint64_t N) {
         return sum;
 }
 
-// Run a Vector Addition test on the Manycore, and compare the result.
-// A and B are the input vectors, C is the destination, and gold is
-// the known-good result computed by the host.
+
+// Run a Vector Addition test on the Manycore, and compare the result.  A
+// and B are the input vectors, C is the destination, and gold is the
+// known-good result computed by the host.
 template<typename TA, typename TB, typename TC>
 int run_test(hb_mc_device_t &device, const char* kernel,
              const TA *A, const TB *B, TC *C, const TC *gold,
@@ -113,7 +83,7 @@ int run_test(hb_mc_device_t &device, const char* kernel,
         void *dst = (void *) ((intptr_t) A_device);
         void *src = (void *) &A[0];
         rc = hb_mc_device_memcpy (&device, dst, src,
-                                  (A_WIDTH) * sizeof(TA),
+                                  (WIDTH) * sizeof(TA),
                                   HB_MC_MEMCPY_TO_DEVICE);
         if (rc != HB_MC_SUCCESS) {
                 bsg_pr_test_err("failed to copy memory to device.\n");
@@ -124,7 +94,7 @@ int run_test(hb_mc_device_t &device, const char* kernel,
         dst = (void *) ((intptr_t) B_device);
         src = (void *) &B[0];
         rc = hb_mc_device_memcpy (&device, dst, src,
-                                  B_WIDTH * sizeof(TB),
+                                  WIDTH * sizeof(TB),
                                   HB_MC_MEMCPY_TO_DEVICE);
         if (rc != HB_MC_SUCCESS) {
                 bsg_pr_test_err("failed to copy memory to device.\n");
@@ -135,8 +105,8 @@ int run_test(hb_mc_device_t &device, const char* kernel,
         // Prepare list of input arguments for kernel. See the kernel source
         // file for the argument uses.
         uint32_t cuda_argv[8] = {A_device, B_device, C_device,
-                                 A_WIDTH, block_size.y, block_size.x,
-                                 tag};
+                                  WIDTH, block_size.y, block_size.x,
+                                  tag, NUM_ITER};
 
         // Enquque grid of tile groups, pass in grid and tile group dimensions,
         // kernel name, number and list of input arguments
@@ -161,7 +131,7 @@ int run_test(hb_mc_device_t &device, const char* kernel,
         src = (void *) ((intptr_t) C_device);
         dst = (void *) &C[0];
         rc = hb_mc_device_memcpy (&device, (void *) dst, src,
-                                  C_WIDTH * sizeof(TC),
+                                  WIDTH * sizeof(TC),
                                   HB_MC_MEMCPY_TO_HOST);
         if (rc != HB_MC_SUCCESS) {
                 bsg_pr_test_err("failed to copy memory from device.\n");
@@ -170,7 +140,7 @@ int run_test(hb_mc_device_t &device, const char* kernel,
 
         // Compare the known-correct vector (gold) and the result vector (C)
         float max = 0.1;
-        double sse = vector_sse(gold, C, C_WIDTH);
+        double sse = vector_sse(gold, C, WIDTH);
 
         if (sse > max) {
                 bsg_pr_test_err(BSG_RED("Vector Mismatch. SSE: %f\n"), sse);
@@ -189,7 +159,7 @@ int kernel_vector_add (int argc, char **argv) {
         bin_path = args.path;
         test_name = args.name;
 
-        bsg_pr_test_info("Running CUDA Single-tile Vector Addition.\n");
+        bsg_pr_test_info("Running CUDA Vector Addition.\n");
 
         // Define tg_dim_x/y: number of tiles in each tile group
         // Define block_size_x/y: amount of work each tile group should do
@@ -199,8 +169,25 @@ int kernel_vector_add (int argc, char **argv) {
         hb_mc_dimension_t tg_dim = { .x = 0, .y = 0 };
         hb_mc_dimension_t grid_dim = { .x = 0, .y = 0 };
         hb_mc_dimension_t block_size = { .x = 0, .y = 0 };
-        tg_dim = { .x = 1, .y = 1 };
-        grid_dim = { .x = 1, .y = 1};
+        if (!strcmp("v0", test_name)){
+                tg_dim = { .x = 1, .y = 1 };
+                grid_dim = { .x = 1, .y = 1};
+        } else if (!strcmp("v1", test_name)){
+                tg_dim = { .x = 4, .y = 1 };
+                grid_dim = {.x = 1, .y = 1};
+        } else if (!strcmp("v2", test_name)){
+                tg_dim = { .x = 4, .y = 4 };
+                grid_dim = {.x = 1, .y = 1};
+        } else if (!strcmp("v3", test_name)){
+                tg_dim = { .x = 2, .y = 2 };
+                block_size = {.x = 4, .y = 1};
+                grid_dim = {.x = WIDTH / block_size.x, .y = 1};
+        } else {
+                bsg_pr_test_err("Invalid version provided!.\n");
+                return HB_MC_INVALID;
+        }
+
+
 
 
         // Initialize the random number generators
@@ -210,37 +197,63 @@ int kernel_vector_add (int argc, char **argv) {
         std::uniform_real_distribution<float> distribution(lim.min(),lim.max());
 
         // Allocate A, B, C and R (result) on the host for each datatype.
-        float A[A_WIDTH];
-        float B[B_WIDTH];
-        float C[C_WIDTH];
-        float R[C_WIDTH];
+        int32_t A_32[WIDTH];
+        int32_t B_32[WIDTH];
+        int32_t C_32[WIDTH];
+        int32_t R_32[WIDTH];
+
+        int16_t A_16[WIDTH];
+        int16_t B_16[WIDTH];
+        int16_t C_16[WIDTH];
+        int16_t R_16[WIDTH];
+
+        int8_t A_8[WIDTH];
+        int8_t B_8[WIDTH];
+        int8_t C_8[WIDTH];
+        int8_t R_8[WIDTH];
+
+        float A_f[WIDTH];
+        float B_f[WIDTH];
+        float C_f[WIDTH];
+        float R_f[WIDTH];
+
         
         // Generate random numbers. Since the Manycore can't handle infinities,
         // subnormal numbers, or NANs, filter those out.
         auto res = distribution(generator);
 
-        for (uint64_t i = 0; i < A_WIDTH; i++) {
+        for (uint64_t i = 0; i < WIDTH; i++) {
                 do{
                         res = distribution(generator);
                 }while(!std::isnormal(res) ||
                        !std::isfinite(res) ||
                        std::isnan(res));
 
-                A[i] = static_cast<float>(res);
+                A_32[i] = static_cast<int32_t>(res);
+                A_16[i] = static_cast<int16_t>(res);
+                A_8[i] = static_cast<int8_t>(res);
+                A_f[i] = static_cast<float>(res);
         }
 
-        for (uint64_t i = 0; i < B_WIDTH; i++) {
+        for (uint64_t i = 0; i < WIDTH; i++) {
                 do{
                         res = distribution(generator);
                 }while(!std::isnormal(res) ||
                        !std::isfinite(res) ||
                        std::isnan(res));
 
-                B[i] = static_cast<float>(res);
+                B_32[i] = static_cast<int32_t>(res);
+                B_16[i] = static_cast<int16_t>(res);
+                B_8[i] = static_cast<int8_t>(res);
+                B_f[i] = static_cast<float>(res);
         }
 
         // Generate the known-correct results on the host
-        vector_add (A, B, R, A_WIDTH);
+        vector_add (A_32, B_32, R_32, WIDTH);
+        vector_add (A_16, B_16, R_16, WIDTH);
+        vector_add (A_8, B_8, R_8, WIDTH);
+        vector_add (A_f, B_f, R_f, WIDTH);
+
 
         // Initialize device, load binary and unfreeze tiles.
         hb_mc_device_t device;
@@ -250,6 +263,7 @@ int kernel_vector_add (int argc, char **argv) {
                 return rc;
         }
 
+
         // Initialize the device with a kernel file
         rc = hb_mc_device_program_init(&device, bin_path, "default_allocator", 0);
         if (rc != HB_MC_SUCCESS) {
@@ -257,12 +271,15 @@ int kernel_vector_add (int argc, char **argv) {
                 return rc;
         }
 
-        // Allocate memory on the device for A, B and C.
+        // Allocate memory on the device for A, B and C. Since sizeof(float) ==
+        // sizeof(int32_t) > sizeof(int16_t) > sizeof(int8_t) we'll reuse the
+        // same buffers for each test
+
         eva_t A_device, B_device, C_device;
 
         // Allocate A on the device
         rc = hb_mc_device_malloc(&device,
-                                 A_WIDTH * sizeof(float),
+                                 WIDTH * sizeof(uint32_t),
                                  &A_device);
         if (rc != HB_MC_SUCCESS) {
                 bsg_pr_test_err("failed to allocate memory on device.\n");
@@ -271,7 +288,7 @@ int kernel_vector_add (int argc, char **argv) {
 
         // Allocate B on the device
         rc = hb_mc_device_malloc(&device,
-                                 B_WIDTH * sizeof(float),
+                                 WIDTH * sizeof(uint32_t),
                                  &B_device);
         if (rc != HB_MC_SUCCESS) {
                 bsg_pr_test_err("failed to allocate memory on device.\n");
@@ -280,18 +297,52 @@ int kernel_vector_add (int argc, char **argv) {
 
         // Allocate C on the device
         rc = hb_mc_device_malloc(&device,
-                                 C_WIDTH * sizeof(float),
+                                 WIDTH * sizeof(uint32_t),
                                  &C_device);
         if (rc != HB_MC_SUCCESS) {
                 bsg_pr_test_err("failed to allocate memory on device.\n");
                 return rc;
         }
 
+
+        // Run the 32-bit integer test and check the result
+        rc = run_test(device, "kernel_vector_add_int",
+                      A_32, B_32, C_32, R_32,
+                      A_device, B_device, C_device,
+                      tg_dim, grid_dim, block_size, 1);
+        if (rc != HB_MC_SUCCESS) {
+                bsg_pr_test_err("int32_t test failed\n");
+                return rc;
+        }
+        bsg_pr_test_info("int32_t test passed!\n");
+
+        // Run the 16-bit integer test and check the result
+        rc = run_test(device, "kernel_vector_add_int16",
+                      A_16, B_16, C_16, R_16,
+                      A_device, B_device, C_device,
+                      tg_dim, grid_dim, block_size, 2);
+        if (rc != HB_MC_SUCCESS) {
+                bsg_pr_test_err("int16_t test failed\n");
+                return rc;
+        }
+        bsg_pr_test_info("int16_t test passed!\n");
+
+        // Run the 8-bit integer test and check the result
+        rc = run_test(device, "kernel_vector_add_int8",
+                      A_8, B_8, C_8, R_8,
+                      A_device, B_device, C_device,
+                      tg_dim, grid_dim, block_size, 3);
+        if (rc != HB_MC_SUCCESS) {
+                bsg_pr_test_err("int8_t test failed\n");
+                return rc;
+        }
+        bsg_pr_test_info("int8_t test passed!\n");
+
         // Run the 32-bit floating-point test and check the result
         rc = run_test(device, "kernel_vector_add_float",
-                      A, B, C, R,
+                      A_f, B_f, C_f, R_f,
                       A_device, B_device, C_device,
-                      tg_dim, grid_dim, block_size, FLOAT_TAG);
+                      tg_dim, grid_dim, block_size, 4);
         if (rc != HB_MC_SUCCESS) {
                 bsg_pr_test_err("float test failed\n");
                 return rc;
@@ -334,3 +385,5 @@ int main(int argc, char ** argv) {
         return rc;
 }
 #endif
+
+

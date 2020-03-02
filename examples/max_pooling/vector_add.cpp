@@ -45,37 +45,15 @@
 // Host Vector Addition code (to compare results)
 template <typename TA, typename TB, typename TC>
 void vector_add (TA *A, TB *B, TC *C, uint64_t N) {
-        // for (uint64_t x = 0; x < N; x++) {
-        //         C[x] = A[x] + B[x];
-        // } 
-        uint64_t x;
-        for (x = 0; x+5 < N; x += 5) {
-                float a = A[x];
-                float a1 = A[x+1];
-                float a2 = A[x+2];
-                float a3 = A[x+3];
-                float a4 = A[x+4];
-
-                float b = B[x];
-                float b1 = B[x+1];
-                float b2 = B[x+2];
-                float b3 = B[x+3];
-                float b4 = B[x+4];
-
-                float sum = a + b;
-                float sum1 = a1 + b1;
-                float sum2 = a2 + b2;
-                float sum3 = a3 + b3;
-                float sum4 = a4 + b4;
-
-                C[x] = sum;
-                C[x+1] = sum1;
-                C[x+2] = sum2;
-                C[x+3] = sum3;
-                C[x+4] = sum4;
-        }
-        for(x; x < N; x++) {
-                C[x] = A[x] + B[x];
+        for(uint64_t i = 0; i + 4 < N; i+=4 ) {
+                float max = A[i];
+                for(uint64_t j = i+1; j < i + 4; j++) {
+                        if(A[j] > max) {
+                                max = A[j];
+                        }
+                        C[j] = 0;
+                }
+                C[i] = max;
         }
         return;
 }
