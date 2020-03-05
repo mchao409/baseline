@@ -28,7 +28,7 @@ extern "C" {
 
         int  __attribute__ ((noinline)) kernel_vector_add_float(
                       float *A, float *C,
-                      uint32_t nels,
+                      uint32_t nels, uint32_t pool_size,
                       uint32_t block_size_y, uint32_t block_size_x,
                       uint32_t tag) {
                 int rc;
@@ -40,7 +40,7 @@ extern "C" {
                 // float testC[nels];
                 bsg_cuda_print_stat_kernel_start();
                 bsg_cuda_print_stat_start(tag);
-                rc = kernel_tile_vector_add(A, C, nels);
+                rc = kernel_tile_vector_add(A, C, nels, pool_size);
                 bsg_cuda_print_stat_end(tag);
                 bsg_cuda_print_stat_kernel_end();
 

@@ -37,17 +37,17 @@
 
 // Matrix sizes:
 #define A_WIDTH  128
-#define B_WIDTH  A_WIDTH
 #define C_WIDTH  A_WIDTH
+#define POOL_WIDTH 4
 #define NUM_ITER 1
 #define FLOAT_TAG 1
 
 // Host Vector Addition code (to compare results)
 template <typename TA, typename TC>
-void vector_add (TA *A, TC *C, uint64_t N) {
-        for(uint64_t i = 0; i + 4 < N; i+=4 ) {
+void max_pooling (TA *A, TC *C, uint64_t N, uint64_t pool_width) {
+        for(uint64_t i = 0; i + pool_width < N; i+=pool_width ) {
                 float max = A[i];
-                for(uint64_t j = i+1; j < i + 4; j++) {
+                for(uint64_t j = i+1; j < i + pool_width; j++) {
                         if(A[j] > max) {
                                 max = A[j];
                         }
@@ -100,7 +100,7 @@ int run_test(hb_mc_device_t &device, const char* kernel,
         // Prepare list of input arguments for kernel. See the kernel source
         // file for the argument uses.
         uint32_t cuda_argv[8] = {A_device, C_device,
-                                 A_WIDTH, block_size.y, block_size.x,
+                                 A_WIDTH, POOL_WIDTH, block_size.y, block_size.x,
                                  tag};
 
         // Enquque grid of tile groups, pass in grid and tile group dimensions,
@@ -174,7 +174,6 @@ int kernel_vector_add (int argc, char **argv) {
 
         // Allocate A, B, C and R (result) on the host for each datatype.
         float A[A_WIDTH];
-        // float B[B_WIDTH];
         float C[C_WIDTH];
         float R[C_WIDTH];
         
@@ -193,7 +192,7 @@ int kernel_vector_add (int argc, char **argv) {
         }
 
         // Generate the known-correct results on the host
-        vector_add (A, R, A_WIDTH);
+        max_pooling (A, R, A_WIDTH, POOL_WIDTH);
 
         // Initialize device, load binary and unfreeze tiles.
         hb_mc_device_t device;

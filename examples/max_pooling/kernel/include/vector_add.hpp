@@ -12,11 +12,10 @@
  */
 template <typename TA, typename TC>
 int __attribute__ ((noinline)) kernel_tile_vector_add(TA *A, TC *C,
-                      uint32_t WIDTH) {
-        // A single tile performs the entire vector addition
-	for (int iter_x = 0; iter_x + 4 < WIDTH; iter_x += 4) { 
+                      uint32_t WIDTH, uint32_t POOL_SIZE) {
+	for (int iter_x = 0; iter_x + POOL_SIZE < WIDTH; iter_x += POOL_SIZE) { 
                 float max = A[iter_x];
-                for(int iter_y = iter_x + 1; iter_y < iter_x + 4; iter_y++) {
+                for(int iter_y = iter_x + 1; iter_y < iter_x + POOL_SIZE; iter_y++) {
                         C[iter_y] = 0;
                         if(A[iter_y] > max) {
                                 max = A[iter_y];
