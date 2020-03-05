@@ -43,8 +43,8 @@
 #define FLOAT_TAG 1
 
 // Host Vector Addition code (to compare results)
-template <typename TA, typename TB, typename TC>
-void vector_add (TA *A, TB *B, TC *C, uint64_t N) {
+template <typename TA, typename TC>
+void vector_add (TA *A, TC *C, uint64_t N) {
         for(uint64_t i = 0; i + 4 < N; i+=4 ) {
                 float max = A[i];
                 for(uint64_t j = i+1; j < i + 4; j++) {
@@ -75,11 +75,12 @@ double vector_sse (const T *A, const T *B, uint64_t N) {
 // Run a Vector Addition test on the Manycore, and compare the result.
 // A and B are the input vectors, C is the destination, and gold is
 // the known-good result computed by the host.
-template<typename TA, typename TB, typename TC>
+template<typename TA, typename TC>
 int run_test(hb_mc_device_t &device, const char* kernel,
-             const TA *A, const TB *B, TC *C, const TC *gold,
+             const TA *A, TC *C, const TC *gold,
+        //      const TA *A, const TB *B, TC *C, const TC *gold,
              const eva_t &A_device,
-             const eva_t &B_device,
+        //      const eva_t &B_device,
              const eva_t &C_device,
              const hb_mc_dimension_t &tg_dim,
              const hb_mc_dimension_t &grid_dim,
@@ -99,20 +100,21 @@ int run_test(hb_mc_device_t &device, const char* kernel,
         }
 
 
-        dst = (void *) ((intptr_t) B_device);
-        src = (void *) &B[0];
-        rc = hb_mc_device_memcpy (&device, dst, src,
-                                  B_WIDTH * sizeof(TB),
-                                  HB_MC_MEMCPY_TO_DEVICE);
-        if (rc != HB_MC_SUCCESS) {
-                bsg_pr_test_err("failed to copy memory to device.\n");
-                return rc;
-        }
+        // dst = (void *) ((intptr_t) B_device);
+        // src = (void *) &B[0];
+        // rc = hb_mc_device_memcpy (&device, dst, src,
+        //                           B_WIDTH * sizeof(TB),
+        //                           HB_MC_MEMCPY_TO_DEVICE);
+        // if (rc != HB_MC_SUCCESS) {
+        //         bsg_pr_test_err("failed to copy memory to device.\n");
+        //         return rc;
+        // }
 
 
         // Prepare list of input arguments for kernel. See the kernel source
         // file for the argument uses.
-        uint32_t cuda_argv[8] = {A_device, B_device, C_device,
+        uint32_t cuda_argv[8] = {A_device, C_device,
+                // uint32_t cuda_argv[8] = {A_device, B_device, C_device,
                                  A_WIDTH, block_size.y, block_size.x,
                                  tag};
 
@@ -189,7 +191,7 @@ int kernel_vector_add (int argc, char **argv) {
 
         // Allocate A, B, C and R (result) on the host for each datatype.
         float A[A_WIDTH];
-        float B[B_WIDTH];
+        // float B[B_WIDTH];
         float C[C_WIDTH];
         float R[C_WIDTH];
         
@@ -207,18 +209,19 @@ int kernel_vector_add (int argc, char **argv) {
                 A[i] = static_cast<float>(res);
         }
 
-        for (uint64_t i = 0; i < B_WIDTH; i++) {
-                do{
-                        res = distribution(generator);
-                }while(!std::isnormal(res) ||
-                       !std::isfinite(res) ||
-                       std::isnan(res));
+        // for (uint64_t i = 0; i < B_WIDTH; i++) {
+        //         do{
+        //                 res = distribution(generator);
+        //         }while(!std::isnormal(res) ||
+        //                !std::isfinite(res) ||
+        //                std::isnan(res));
 
-                B[i] = static_cast<float>(res);
-        }
+        //         B[i] = static_cast<float>(res);
+        // }
 
         // Generate the known-correct results on the host
-        vector_add (A, B, R, A_WIDTH);
+        // vector_add (A, B, R, A_WIDTH);
+        vector_add (A, R, A_WIDTH);
 
         // Initialize device, load binary and unfreeze tiles.
         hb_mc_device_t device;
@@ -236,7 +239,8 @@ int kernel_vector_add (int argc, char **argv) {
         }
 
         // Allocate memory on the device for A, B and C.
-        eva_t A_device, B_device, C_device;
+        // eva_t A_device, B_device, C_device;
+        eva_t A_device, C_device;
 
         // Allocate A on the device
         rc = hb_mc_device_malloc(&device,
@@ -248,13 +252,13 @@ int kernel_vector_add (int argc, char **argv) {
         }
 
         // Allocate B on the device
-        rc = hb_mc_device_malloc(&device,
-                                 B_WIDTH * sizeof(float),
-                                 &B_device);
-        if (rc != HB_MC_SUCCESS) {
-                bsg_pr_test_err("failed to allocate memory on device.\n");
-                return rc;
-        }
+        // rc = hb_mc_device_malloc(&device,
+        //                          B_WIDTH * sizeof(float),
+        //                          &B_device);
+        // if (rc != HB_MC_SUCCESS) {
+        //         bsg_pr_test_err("failed to allocate memory on device.\n");
+        //         return rc;
+        // }
 
         // Allocate C on the device
         rc = hb_mc_device_malloc(&device,
@@ -267,8 +271,8 @@ int kernel_vector_add (int argc, char **argv) {
 
         // Run the 32-bit floating-point test and check the result
         rc = run_test(device, "kernel_vector_add_float",
-                      A, B, C, R,
-                      A_device, B_device, C_device,
+                      A, C, R,
+                      A_device, C_device,
                       tg_dim, grid_dim, block_size, FLOAT_TAG);
         if (rc != HB_MC_SUCCESS) {
                 bsg_pr_test_err("float test failed\n");

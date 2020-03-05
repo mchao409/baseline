@@ -27,22 +27,21 @@ extern int bsg_printf(const char*, ...);
 extern "C" {
 
         int  __attribute__ ((noinline)) kernel_vector_add_float(
-                      float *A, float *B, float *C,
+                      float *A, float *C,
                       uint32_t nels,
                       uint32_t block_size_y, uint32_t block_size_x,
                       uint32_t tag) {
                 int rc;
 
-                float testA[nels];
-                memcpy(testA, A, sizeof(float)*nels);
-                float testB[nels];
-                memcpy(testB, B, sizeof(float)*nels);
-                float testC[nels];
-
+                // float testA[nels];
+                // memcpy(testA, A, sizeof(float)*nels);
+                // float testB[nels];
+                // memcpy(testB, B, sizeof(float)*nels);
+                // float testC[nels];
                 bsg_cuda_print_stat_kernel_start();
                 bsg_cuda_print_stat_start(tag);
-                rc = kernel_tile_vector_add(testA, testB, testC, nels);
-                memcpy(C,testC, sizeof(float)*nels);
+                rc = kernel_tile_vector_add(A, C, nels);
+                // memcpy(C,testC, sizeof(float)*nels);
                 bsg_cuda_print_stat_end(tag);
                 bsg_cuda_print_stat_kernel_end();
 
