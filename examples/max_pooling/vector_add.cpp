@@ -78,9 +78,7 @@ double vector_sse (const T *A, const T *B, uint64_t N) {
 template<typename TA, typename TC>
 int run_test(hb_mc_device_t &device, const char* kernel,
              const TA *A, TC *C, const TC *gold,
-        //      const TA *A, const TB *B, TC *C, const TC *gold,
              const eva_t &A_device,
-        //      const eva_t &B_device,
              const eva_t &C_device,
              const hb_mc_dimension_t &tg_dim,
              const hb_mc_dimension_t &grid_dim,
@@ -99,22 +97,9 @@ int run_test(hb_mc_device_t &device, const char* kernel,
                 return rc;
         }
 
-
-        // dst = (void *) ((intptr_t) B_device);
-        // src = (void *) &B[0];
-        // rc = hb_mc_device_memcpy (&device, dst, src,
-        //                           B_WIDTH * sizeof(TB),
-        //                           HB_MC_MEMCPY_TO_DEVICE);
-        // if (rc != HB_MC_SUCCESS) {
-        //         bsg_pr_test_err("failed to copy memory to device.\n");
-        //         return rc;
-        // }
-
-
         // Prepare list of input arguments for kernel. See the kernel source
         // file for the argument uses.
         uint32_t cuda_argv[8] = {A_device, C_device,
-                // uint32_t cuda_argv[8] = {A_device, B_device, C_device,
                                  A_WIDTH, block_size.y, block_size.x,
                                  tag};
 
@@ -127,7 +112,6 @@ int run_test(hb_mc_device_t &device, const char* kernel,
                 return rc;
         }
 
-
         // Launch and execute all tile groups on device and wait for all to
         // finish.
         rc = hb_mc_device_tile_groups_execute(&device);
@@ -135,7 +119,6 @@ int run_test(hb_mc_device_t &device, const char* kernel,
                 bsg_pr_test_err("failed to execute tile groups.\n");
                 return rc;
         }
-
 
         // Copy result vector back from device DRAM into host memory.
         src = (void *) ((intptr_t) C_device);
@@ -209,18 +192,7 @@ int kernel_vector_add (int argc, char **argv) {
                 A[i] = static_cast<float>(res);
         }
 
-        // for (uint64_t i = 0; i < B_WIDTH; i++) {
-        //         do{
-        //                 res = distribution(generator);
-        //         }while(!std::isnormal(res) ||
-        //                !std::isfinite(res) ||
-        //                std::isnan(res));
-
-        //         B[i] = static_cast<float>(res);
-        // }
-
         // Generate the known-correct results on the host
-        // vector_add (A, B, R, A_WIDTH);
         vector_add (A, R, A_WIDTH);
 
         // Initialize device, load binary and unfreeze tiles.
@@ -239,7 +211,6 @@ int kernel_vector_add (int argc, char **argv) {
         }
 
         // Allocate memory on the device for A, B and C.
-        // eva_t A_device, B_device, C_device;
         eva_t A_device, C_device;
 
         // Allocate A on the device
@@ -250,15 +221,6 @@ int kernel_vector_add (int argc, char **argv) {
                 bsg_pr_test_err("failed to allocate memory on device.\n");
                 return rc;
         }
-
-        // Allocate B on the device
-        // rc = hb_mc_device_malloc(&device,
-        //                          B_WIDTH * sizeof(float),
-        //                          &B_device);
-        // if (rc != HB_MC_SUCCESS) {
-        //         bsg_pr_test_err("failed to allocate memory on device.\n");
-        //         return rc;
-        // }
 
         // Allocate C on the device
         rc = hb_mc_device_malloc(&device,

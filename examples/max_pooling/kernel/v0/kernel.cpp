@@ -41,7 +41,6 @@ extern "C" {
                 bsg_cuda_print_stat_kernel_start();
                 bsg_cuda_print_stat_start(tag);
                 rc = kernel_tile_vector_add(A, C, nels);
-                // memcpy(C,testC, sizeof(float)*nels);
                 bsg_cuda_print_stat_end(tag);
                 bsg_cuda_print_stat_kernel_end();
 
