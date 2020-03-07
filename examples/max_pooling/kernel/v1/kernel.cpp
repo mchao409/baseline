@@ -33,14 +33,15 @@ extern "C" {
                       uint32_t tag) {
                 int rc;
 
-                // float testA[nels];
-                // memcpy(testA, A, sizeof(float)*nels);
+                float testA[nels];
+                memcpy(testA, A, sizeof(float)*nels);
                 // float testB[nels];
                 // memcpy(testB, B, sizeof(float)*nels);
-                // float testC[pool_size];
+                float testC[nels];
                 bsg_cuda_print_stat_kernel_start();
                 bsg_cuda_print_stat_start(tag);
-                rc = kernel_tile_vector_add(A, C, nels, pool_size);
+                rc = kernel_tile_vector_add(testA, testC, nels, pool_size);
+                memcpy(C,testC, sizeof(float) * nels);
                 bsg_cuda_print_stat_end(tag);
                 bsg_cuda_print_stat_kernel_end();
 
